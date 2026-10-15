@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面待办事项</title>
+<style>
+  /* ============ 设计主题：红 / 蓝 / 白 ============ */
+  :root{
+    --red:#e53935;        /* 主强调红 */
+    --red-deep:#c62828;
+    --red-soft:#fdecea;
+    --blue:#1565c0;       /* 主蓝 */
+    --blue-mid:#1e88e5;
+    --blue-deep:#0d47a1;
+    --blue-soft:#e8f0fe;
+    --white:#ffffff;
+    --bg:#f4f6fb;         /* 页面底 */
+    --ink:#1f2430;        /* 主文字 */
+    --ink-2:#6b7280;      /* 次级文字 */
+    --ink-3:#9aa3b2;      /* 弱文字 */
+    --line:#e6e9f0;       /* 分隔线 */
+    --shadow:0 10px 40px rgba(20,40,80,.18), 0 2px 8px rgba(20,40,80,.08);
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    background:
+      radial-gradient(1200px 620px at 12% -12%, rgba(30,136,229,.16), transparent 60%),
+      radial-gradient(900px 520px at 108% 112%, rgba(229,57,53,.13), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+
+  /* ---------- 可拖动卡片 ---------- */
+  .card{
+    position:fixed; width:404px; max-width:calc(100vw - 32px);
+    max-height:calc(100vh - 32px);
+    background:var(--white);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  .titlebar{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 16px;
+    background:linear-gradient(135deg,var(--blue-deep) 0%,var(--blue) 45%,var(--blue-mid) 100%);
+    color:#fff; cursor:move; flex:none;
+  }
+  .titlebar .dot{
+    width:10px; height:10px; border-radius:50%; background:#ff5252; flex:none;
+    box-shadow:0 0 0 3px rgba(255,82,82,.25);
+  }
+  .titlebar .title{font-weight:600; font-size:15px; letter-spacing:.5px;}
+  .titlebar .hint{margin-left:auto; font-size:11px; opacity:.85;}
+
+  .body{
+    padding:14px 16px 16px; display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto; flex:1;
+  }
+
+  /* ---------- 日期导航 ---------- */
+  .datebar{display:flex; align-items:center; gap:8px;}
+  .datebar input[type=date]{
+    flex:1; min-width:0; padding:8px 10px; border:1px solid var(--line); border-radius:10px;
+    font:inherit; font-size:14px; color:var(--ink); background:#fff; outline:none;
+    -webkit-user-select:auto; user-select:auto;
+  }
+  .datebar input[type=date]:focus{border-color:var(--blue-mid); box-shadow:0 0 0 3px rgba(30,136,229,.15);}
+  .navbtn{
+    width:34px; height:34px; border:none; border-radius:10px; background:var(--blue-soft);
+    color:var(--blue); font-size:18px; line-height:1; cursor:pointer; flex:none;
+  }
+  .navbtn:hover{background:#d6e6fc;}
+  .todaybtn{
+    height:34px; padding:0 12px; border:1px solid var(--red); border-radius:10px;
+    background:#fff; color:var(--red); font-size:13px; cursor:pointer; flex:none;
+  }
+  .todaybtn:hover{background:var(--red-soft);}
+
+  /* ---------- 添加 ---------- */
+  .addrow{display:flex; gap:8px;}
+  .addrow input{
+    flex:1; min-width:0; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    font:inherit; font-size:14px; outline:none;
+    -webkit-user-select:auto; user-select:auto;
+  }
+  .addrow input:focus{border-color:var(--blue-mid); box-shadow:0 0 0 3px rgba(30,136,229,.15);}
+  .addbtn{
+    padding:0 18px; border:none; border-radius:10px;
+    background:linear-gradient(135deg,var(--red),#ef5350); color:#fff;
+    font-size:14px; font-weight:600; cursor:pointer; flex:none;
+  }
+  .addbtn:hover{filter:brightness(1.05);}
+  .addbtn:active{transform:translateY(1px);}
+
+  /* ---------- 完成情况 ---------- */
+  .stats{display:flex; align-items:center; gap:10px;}
+  .stats .label{font-size:12.5px; color:var(--ink-2); flex:none; white-space:nowrap;}
+  .stats .label b{color:var(--blue); font-size:14px; font-variant-numeric:tabular-nums;}
+  .progress{flex:1; height:7px; background:#eef1f6; border-radius:99px; overflow:hidden;}
+  .progress .fill{
+    height:100%; width:0; border-radius:99px;
+    background:linear-gradient(90deg,var(--blue-mid),var(--red));
+    transition:width .25s ease;
+  }
+  .badge{
+    font-size:11px; padding:2px 8px; border-radius:99px; background:var(--red-soft);
+    color:var(--red); flex:none; white-space:nowrap;
+  }
+
+  /* ---------- 任务列表 ---------- */
+  .list{list-style:none; display:flex; flex-direction:column; gap:8px;}
+  .empty{padding:26px 12px; text-align:center; color:var(--ink-2); font-size:13px;}
+  .task{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 12px; transition:box-shadow .15s;}
+  .task:hover{box-shadow:0 2px 10px rgba(20,40,80,.08);}
+  .task.done .tasktitle{color:var(--ink-3); text-decoration:line-through;}
+  .taskrow{display:flex; align-items:center; gap:10px;}
+  .check{
+    width:20px; height:20px; border-radius:6px; border:2px solid #c4ccd8; background:#fff;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff;
+    flex:none; transition:.15s; padding:0;
+  }
+  .task.done .check{background:var(--blue); border-color:var(--blue);}
+  .check svg{width:13px; height:13px; opacity:0;}
+  .task.done .check svg{opacity:1;}
+  .tasktitle{flex:1; min-width:0; font-size:14px; line-height:1.4; word-break:break-word;
+    -webkit-user-select:auto; user-select:auto;}
+  .tasktime{
+    font-size:12px; color:var(--blue); font-variant-numeric:tabular-nums; flex:none; font-weight:600;
+  }
+  .tasktime.running{color:var(--red);}
+  .timerbtn{
+    height:26px; padding:0 9px; border:1px solid var(--blue); border-radius:8px;
+    background:#fff; color:var(--blue); font-size:12px; cursor:pointer; flex:none;
+  }
+  .timerbtn:hover{background:var(--blue-soft);}
+  .timerbtn.stop{border-color:var(--red); color:var(--red);}
+  .timerbtn.stop:hover{background:var(--red-soft);}
+  .iconbtn{
+    width:26px; height:26px; border:none; border-radius:8px; background:transparent;
+    color:#c2c9d4; font-size:14px; cursor:pointer; flex:none; line-height:1;
+  }
+  .iconbtn:hover{background:var(--blue-soft); color:var(--blue);}
+  .iconbtn.has{color:var(--blue);}
+  .delbtn{
+    width:26px; height:26px; border:none; border-radius:8px; background:transparent;
+    color:#c2c9d4; font-size:14px; cursor:pointer; flex:none; line-height:1;
+  }
+  .delbtn:hover{background:var(--red-soft); color:var(--red);}
+
+  /* ---------- 总结 ---------- */
+  .summarybox{display:none; margin-top:8px; padding-left:30px; flex-direction:column; gap:6px;}
+  .task.show .summarybox{display:flex;}
+  .summarybox textarea{
+    width:100%; min-height:58px; padding:8px 10px; border:1px solid var(--line); border-radius:10px;
+    font:inherit; font-size:13px; resize:vertical; outline:none; background:#fbfcfe; color:var(--ink);
+    -webkit-user-select:auto; user-select:auto;
+  }
+  .summarybox textarea:focus{border-color:var(--blue-mid);}
+  .summeta{font-size:11px; color:var(--ink-3);}
+
+  /* ---------- 底部 ---------- */
+  .footer{
+    padding:10px 16px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-3);
+    display:flex; justify-content:space-between; flex:none;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="titlebar" id="titlebar">
+      <span class="dot"></span>
+      <span class="title">桌面待办事项</span>
+      <span class="hint">拖动标题栏移动</span>
+    </div>
+
+    <div class="body">
+      <div class="datebar">
+        <button class="navbtn" id="prevBtn" title="前一天">‹</button>
+        <input type="date" id="dateInput" aria-label="选择日期">
+        <button class="navbtn" id="nextBtn" title="后一天">›</button>
+        <button class="todaybtn" id="todayBtn">今天</button>
+      </div>
+
+      <div class="addrow">
+        <input id="taskInput" placeholder="输入新的待办事项，回车添加…" maxlength="200" aria-label="新的待办事项">
+        <button class="addbtn" id="addBtn">添加</button>
+      </div>
+
+      <div class="stats">
+        <span class="label">完成 <b id="doneCount">0</b>/<span id="totalCount">0</span></span>
+        <div class="progress"><div class="fill" id="progressFill"></div></div>
+        <span class="badge" id="historyBadge" hidden>历史</span>
+      </div>
+
+      <ul class="list" id="taskList"></ul>
+    </div>
+
+    <div class="footer">
+      <span>数据保存在本机浏览器</span>
+      <span>⏱ 记录每项用时</span>
+    </div>
+  </div>
+
+<script>
+(function(){
+  'use strict';
+  var STORAGE_KEY = 'desktop_todo_data_v1';
+  var POS_KEY = 'desktop_todo_pos_v1';
+
+  var card = document.getElementById('card');
+  var titlebar = document.getElementById('titlebar');
+  var dateInput = document.getElementById('dateInput');
+  var taskInput = document.getElementById('taskInput');
+  var taskList = document.getElementById('taskList');
+  var historyBadge = document.getElementById('historyBadge');
+  var doneCountEl = document.getElementById('doneCount');
+  var totalCountEl = document.getElementById('totalCount');
+  var progressFill = document.getElementById('progressFill');
+
+  var data = loadData();
+  var currentDate = todayStr();
+  var pos = loadPos();
+
+  /* ---------------- 存储 ---------------- */
+  function loadData(){
+    try{ var d = JSON.parse(localStorage.getItem(STORAGE_KEY)); return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {}; }
+    catch(e){ return {}; }
+  }
+  function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){} }
+  function loadPos(){
+    try{ var p = JSON.parse(localStorage.getItem(POS_KEY)); if(p && typeof p.left === 'number' && typeof p.top === 'number') return p; }catch(e){}
+    return null;
+  }
+  function savePos(){ try{ localStorage.setItem(POS_KEY, JSON.stringify(pos)); }catch(e){} }
+
+  /* ---------------- 工具 ---------------- */
+  function dateKey(d){
+    var y = d.getFullYear();
+    var m = String(d.getMonth()+1).padStart(2,'0');
+    var day = String(d.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+day;
+  }
+  function todayStr(){ return dateKey(new Date()); }
+  function parseDate(s){ var p = s.split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+  function tasksFor(date){ if(!Array.isArray(data[date])) data[date] = []; return data[date]; }
+  function findTask(id){
+    var arr = tasksFor(currentDate);
+    for(var i=0;i<arr.length;i++) if(arr[i].id === id) return arr[i];
+    return null;
+  }
+  function fmt(ms){
+    var s = Math.floor(ms/1000), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+    return h>0 ? h+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')
+               : String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  }
+  function currentElapsed(t){
+    var ms = t.timer.accumulatedMs || 0;
+    if(t.timer.running && t.timer.startedAt) ms += Date.now() - t.timer.startedAt;
+    return ms;
+  }
+  function stopAllRunning(){
+    var arr = tasksFor(currentDate);
+    arr.forEach(function(t){
+      if(t.timer.running){
+        t.timer.accumulatedMs += Date.now() - t.timer.startedAt;
+        t.timer.running = false;
+        t.timer.startedAt = null;
+      }
+    });
+  }
+
+  /* ---------------- 操作 ---------------- */
+  function addTask(){
+    var title = taskInput.value.trim();
+    if(!title) return;
+    tasksFor(currentDate).push({
+      id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      title: title, done: false, summary: '', createdAt: Date.now(), completedAt: null,
+      timer: { accumulatedMs: 0, running: false, startedAt: null }
+    });
+    taskInput.value = '';
+    save(); render();
+  }
+  function toggleDone(id){
+    var t = findTask(id); if(!t) return;
+    t.done = !t.done;
+    if(t.done){
+      if(t.timer.running){ t.timer.accumulatedMs += Date.now()-t.timer.startedAt; t.timer.running=false; t.timer.startedAt=null; }
+      t.completedAt = Date.now();
+    } else {
+      t.completedAt = null;
+    }
+    save(); render();
+  }
+  function deleteTask(id){
+    data[currentDate] = tasksFor(currentDate).filter(function(t){ return t.id !== id; });
+    save(); render();
+  }
+  function setSummary(id, val){ var t = findTask(id); if(!t) return; t.summary = val; save(); }
+  function toggleTimer(id){
+    var t = findTask(id); if(!t || t.done) return;
+    if(t.timer.running){
+      t.timer.accumulatedMs += Date.now() - t.timer.startedAt;
+      t.timer.running = false; t.timer.startedAt = null;
+    } else {
+      stopAllRunning();
+      t.timer.running = true; t.timer.startedAt = Date.now();
+    }
+    save(); render();
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  function buildTask(t, isToday){
+    var li = document.createElement('li');
+    li.className = 'task' + (t.done ? ' done' : '') + (t.summary ? ' show' : '');
+
+    var row = document.createElement('div');
+    row.className = 'taskrow';
+
+    var check = document.createElement('button');
+    check.type = 'button';
+    check.className = 'check';
+    check.title = t.done ? '标记为未完成' : '标记为完成';
+    check.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    check.addEventListener('click', function(){ toggleDone(t.id); });
+    row.appendChild(check);
+
+    var title = document.createElement('span');
+    title.className = 'tasktitle';
+    title.textContent = t.title;
+    row.appendChild(title);
+
+    var time = document.createElement('span');
+    time.className = 'tasktime' + (t.timer.running ? ' running' : '');
+    time.id = 'time-' + t.id;
+    time.textContent = '⏱ ' + fmt(currentElapsed(t));
+    row.appendChild(time);
+
+    if(isToday){
+      var tbtn = document.createElement('button');
+      tbtn.type = 'button';
+      tbtn.className = 'timerbtn' + (t.timer.running ? ' stop' : '');
+      tbtn.textContent = t.timer.running ? '停止' : '计时';
+      tbtn.title = t.timer.running ? '停止计时' : '开始计时';
+      tbtn.addEventListener('click', function(){ toggleTimer(t.id); });
+      row.appendChild(tbtn);
+    }
+
+    var sbtn = document.createElement('button');
+    sbtn.type = 'button';
+    sbtn.className = 'iconbtn' + (t.summary ? ' has' : '');
+    sbtn.title = '写总结 / 查看总结';
+    sbtn.textContent = '✎';
+    sbtn.addEventListener('click', function(){ li.classList.toggle('show'); });
+    row.appendChild(sbtn);
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'delbtn';
+    del.title = '删除';
+    del.textContent = '✕';
+    del.addEventListener('click', function(){ deleteTask(t.id); });
+    row.appendChild(del);
+
+    li.appendChild(row);
+
+    var box = document.createElement('div');
+    box.className = 'summarybox';
+    var ta = document.createElement('textarea');
+    ta.placeholder = '记录这项任务的总结…';
+    ta.value = t.summary || '';
+    ta.addEventListener('input', function(){ setSummary(t.id, ta.value); });
+    box.appendChild(ta);
+    var meta = document.createElement('span');
+    meta.className = 'summeta';
+    meta.textContent = '完成用时 ' + fmt(t.timer.accumulatedMs || 0) +
+      (t.completedAt ? ' · ' + new Date(t.completedAt).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) : '');
+    box.appendChild(meta);
+    li.appendChild(box);
+
+    return li;
+  }
+
+  function render(){
+    var arr = tasksFor(currentDate);
+    var isToday = currentDate === todayStr();
+
+    dateInput.value = currentDate;
+    historyBadge.hidden = isToday;
+
+    var done = 0;
+    arr.forEach(function(t){ if(t.done) done++; });
+    doneCountEl.textContent = done;
+    totalCountEl.textContent = arr.length;
+    progressFill.style.width = arr.length ? (done/arr.length*100) + '%' : '0%';
+
+    taskList.innerHTML = '';
+    if(arr.length === 0){
+      var li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = isToday ? '还没有待办事项，先添加一条吧' : '这一天没有记录';
+      taskList.appendChild(li);
+      return;
+    }
+    arr.forEach(function(t){ taskList.appendChild(buildTask(t, isToday)); });
+  }
+
+  /* ---------------- 日期导航 ---------------- */
+  function shiftDate(delta){
+    var d = parseDate(currentDate);
+    d.setDate(d.getDate() + delta);
+    currentDate = dateKey(d);
+    render();
+  }
+  document.getElementById('prevBtn').addEventListener('click', function(){ shiftDate(-1); });
+  document.getElementById('nextBtn').addEventListener('click', function(){ shiftDate(1); });
+  document.getElementById('todayBtn').addEventListener('click', function(){ currentDate = todayStr(); render(); });
+  dateInput.addEventListener('change', function(){ if(dateInput.value){ currentDate = dateInput.value; render(); } });
+
+  /* ---------------- 添加 ---------------- */
+  document.getElementById('addBtn').addEventListener('click', addTask);
+  taskInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') addTask(); });
+
+  /* ---------------- 拖动 ---------------- */
+  var dragging = false, dx = 0, dy = 0;
+  function initPos(){
+    if(!pos){
+      var left = Math.max(16, Math.round((window.innerWidth - card.offsetWidth) / 2));
+      pos = { left: left, top: 48 };
+    }
+    clampPos();
+    card.style.left = pos.left + 'px';
+    card.style.top = pos.top + 'px';
+  }
+  function clampPos(){
+    var maxLeft = Math.max(16, window.innerWidth - 60);
+    var maxTop = Math.max(0, window.innerHeight - 48);
+    pos.left = Math.max(-card.offsetWidth + 60, Math.min(pos.left, maxLeft));
+    pos.top = Math.max(0, Math.min(pos.top, maxTop));
+  }
+  titlebar.addEventListener('mousedown', function(e){
+    dragging = true;
+    dx = e.clientX - pos.left;
+    dy = e.clientY - pos.top;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function(e){
+    if(!dragging) return;
+    pos.left = e.clientX - dx;
+    pos.top = e.clientY - dy;
+    clampPos();
+    card.style.left = pos.left + 'px';
+    card.style.top = pos.top + 'px';
+  });
+  window.addEventListener('mouseup', function(){
+    if(dragging){ dragging = false; savePos(); }
+  });
+  window.addEventListener('resize', function(){ clampPos(); card.style.left = pos.left + 'px'; card.style.top = pos.top + 'px'; });
+
+  /* ---------------- 计时刷新 ---------------- */
+  setInterval(function(){
+    var arr = tasksFor(currentDate);
+    arr.forEach(function(t){
+      var el = document.getElementById('time-' + t.id);
+      if(el){
+        el.textContent = '⏱ ' + fmt(currentElapsed(t));
+        el.className = 'tasktime' + (t.timer.running ? ' running' : '');
+      }
+    });
+  }, 1000);
+
+  /* ---------------- 启动 ---------------- */
+  initPos();
+  render();
+})();
+</script>
+</body>
+</html>

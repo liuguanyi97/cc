@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DesktopTodo</AssemblyName>
+    <RootNamespace>DesktopTodo</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>liuguanyi97</Authors>
+  </PropertyGroup>
+
+</Project>
