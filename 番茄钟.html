@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍅 番茄钟</title>
+<style>
+  :root {
+    --accent: #e74c3c;
+    --accent-soft: #fdecea;
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #2c3e50;
+    --muted: #8a94a6;
+    --ring-track: #eceff3;
+    --shadow: 0 20px 50px rgba(30, 40, 60, 0.12);
+    --border: #e6e9ef;
+  }
+  [data-theme="dark"] {
+    --bg: #15181f;
+    --card: #1e222b;
+    --text: #e8ebf0;
+    --muted: #7d8798;
+    --ring-track: #2a303b;
+    --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    --border: #2c323d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    transition: background .3s, color .3s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card);
+    border-radius: 28px;
+    box-shadow: var(--shadow);
+    padding: 32px 28px 26px;
+    text-align: center;
+    position: relative;
+    transition: background .3s, box-shadow .3s;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .brand { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: .5px; }
+  .top-actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s, transform .1s;
+  }
+  .icon-btn:hover { background: var(--ring-track); color: var(--text); }
+  .icon-btn:active { transform: scale(.94); }
+
+  .modes {
+    display: flex; gap: 6px; background: var(--ring-track);
+    border-radius: 12px; padding: 4px; margin: 12px 0 22px;
+  }
+  .mode-btn {
+    flex: 1; border: none; background: transparent; color: var(--muted);
+    font-size: 13px; font-weight: 600; padding: 9px 4px; border-radius: 9px;
+    cursor: pointer; transition: all .2s;
+  }
+  .mode-btn.active { background: var(--card); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+  .ring-wrap { position: relative; width: 260px; height: 260px; margin: 0 auto; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: var(--ring-track); stroke-width: 10; }
+  .ring { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round;
+          transition: stroke .4s, stroke-dashoffset .2s linear; }
+  .time-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+  }
+  .time { font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .phase-label { font-size: 13px; color: var(--muted); }
+
+  .dots { display: flex; gap: 8px; justify-content: center; margin: 22px 0 4px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ring-track); transition: background .3s, transform .2s; }
+  .dot.filled { background: var(--accent); transform: scale(1.15); }
+  .stat { font-size: 12.5px; color: var(--muted); margin-bottom: 20px; }
+
+  .controls { display: flex; gap: 12px; justify-content: center; align-items: center; }
+  .btn {
+    border: none; cursor: pointer; font-family: inherit; font-weight: 600;
+    border-radius: 14px; transition: transform .1s, box-shadow .2s, background .2s, opacity .2s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn-main {
+    background: var(--accent); color: #fff; font-size: 16px;
+    padding: 14px 40px; box-shadow: 0 8px 20px rgba(0,0,0,.15);
+  }
+  .btn-main:hover { box-shadow: 0 10px 24px rgba(0,0,0,.2); }
+  .btn-side {
+    background: var(--ring-track); color: var(--text); font-size: 13px; padding: 12px 18px;
+  }
+  .btn-side:hover { opacity: .85; }
+
+  .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); opacity: .8; }
+  .hint kbd {
+    background: var(--ring-track); border-radius: 5px; padding: 2px 6px;
+    font-family: inherit; font-size: 11px; margin: 0 2px;
+  }
+
+  /* 设置弹窗 */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(15, 18, 25, .5); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 20px; padding: 26px 24px; width: 100%; max-width: 340px;
+    text-align: left; box-shadow: 0 24px 60px rgba(0,0,0,.3);
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 18px; text-align: center; }
+  .field { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .field label { font-size: 14px; color: var(--text); }
+  .field input[type="number"] {
+    width: 64px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--ring-track); color: var(--text); font-size: 14px; text-align: center;
+    font-family: inherit;
+  }
+  .field input[type="number"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .switch { position: relative; width: 44px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0; background: var(--ring-track); border-radius: 24px;
+    cursor: pointer; transition: background .2s;
+  }
+  .slider::before {
+    content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+  .modal .btn-main { width: 100%; margin-top: 8px; padding: 12px; font-size: 15px; }
+
+  @media (max-width: 420px) {
+    .ring-wrap { width: 220px; height: 220px; }
+    .time { font-size: 46px; }
+  }
+</style>
+</head>
+<body data-theme="light">
+
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">🍅 番茄钟</span>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeBtn" title="切换主题">🌙</button>
+        <button class="icon-btn" id="settingsBtn" title="设置">⚙️</button>
+      </div>
+    </div>
+
+    <div class="modes" id="modes">
+      <button class="mode-btn active" data-mode="focus">专注</button>
+      <button class="mode-btn" data-mode="short">短休息</button>
+      <button class="mode-btn" data-mode="long">长休息</button>
+    </div>
+
+    <div class="ring-wrap">
+      <svg viewBox="0 0 260 260">
+        <circle class="ring-track" cx="130" cy="130" r="118"></circle>
+        <circle class="ring" id="ring" cx="130" cy="130" r="118"></circle>
+      </svg>
+      <div class="time-center">
+        <div class="time" id="time">25:00</div>
+        <div class="phase-label" id="phaseLabel">专注</div>
+      </div>
+    </div>
+
+    <div class="dots" id="dots"></div>
+    <div class="stat" id="stat">今日完成 0 个番茄</div>
+
+    <div class="controls">
+      <button class="btn btn-side" id="resetBtn" title="重置">重置</button>
+      <button class="btn btn-main" id="toggleBtn">开始</button>
+      <button class="btn btn-side" id="skipBtn" title="跳过">跳过</button>
+    </div>
+
+    <div class="hint">
+      <kbd>空格</kbd> 开始 / 暂停 · <kbd>R</kbd> 重置 · <kbd>S</kbd> 跳过
+    </div>
+  </div>
+
+  <!-- 设置弹窗 -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h3>设置</h3>
+      <div class="field"><label>专注时长（分钟）</label><input type="number" id="setFocus" min="1" max="180"></div>
+      <div class="field"><label>短休息（分钟）</label><input type="number" id="setShort" min="1" max="60"></div>
+      <div class="field"><label>长休息（分钟）</label><input type="number" id="setLong" min="1" max="60"></div>
+      <div class="field"><label>长休息间隔（个番茄）</label><input type="number" id="setInterval" min="1" max="12"></div>
+      <div class="field"><label>自动开始下一阶段</label>
+        <label class="switch"><input type="checkbox" id="setAuto"><span class="slider"></span></label>
+      </div>
+      <div class="field"><label>提示音</label>
+        <label class="switch"><input type="checkbox" id="setSound"><span class="slider"></span></label>
+      </div>
+      <div class="field"><label>桌面通知</label>
+        <label class="switch"><input type="checkbox" id="setNotify"><span class="slider"></span></label>
+      </div>
+      <button class="btn btn-main" id="saveBtn">保存</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const DEFAULTS = { focus: 25, short: 5, long: 15, interval: 4, autoStart: false, sound: true, notify: true, theme: 'light' };
+  const MODE_META = {
+    focus: { label: '专注', color: '#e74c3c', soft: '#fdecea' },
+    short: { label: '短休息', color: '#27ae60', soft: '#eafaf1' },
+    long:  { label: '长休息', color: '#2980b9', soft: '#eaf4fb' }
+  };
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    time: $('time'), ring: $('ring'), phaseLabel: $('phaseLabel'),
+    toggle: $('toggleBtn'), reset: $('resetBtn'), skip: $('skipBtn'),
+    dots: $('dots'), stat: $('stat'), modes: $('modes'),
+    themeBtn: $('themeBtn'), settingsBtn: $('settingsBtn'), overlay: $('overlay'),
+    setFocus: $('setFocus'), setShort: $('setShort'), setLong: $('setLong'),
+    setInterval: $('setInterval'), setAuto: $('setAuto'), setSound: $('setSound'),
+    setNotify: $('setNotify'), save: $('saveBtn')
+  };
+
+  const RING_C = 2 * Math.PI * 118;
+
+  // ---- 设置 / 状态 ----
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem('pomodoro.settings')) || {}; }
+    catch (e) { return {}; }
+  }
+  let settings = Object.assign({}, DEFAULTS, loadSettings());
+
+  let state = {
+    mode: 'focus',
+    total: settings.focus * 60,
+    left: settings.focus * 60,
+    running: false,
+    endTime: 0,
+    timer: null,
+    focusCount: 0,          // 累计完成的专注次数（用于计算长休息）
+    focusToday: 0
+  };
+
+  function todayKey() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+
+  function loadToday() {
+    try { return JSON.parse(localStorage.getItem('pomodoro.today')) || { key: '', count: 0 }; }
+    catch (e) { return { key: '', count: 0 }; }
+  }
+  let today = loadToday();
+  if (today.key !== todayKey()) { today = { key: todayKey(), count: 0 }; }
+  state.focusToday = today.count;
+
+  function saveToday() {
+    localStorage.setItem('pomodoro.today', JSON.stringify({ key: todayKey(), count: state.focusToday }));
+  }
+  function saveSettings() {
+    localStorage.setItem('pomodoro.settings', JSON.stringify(settings));
+  }
+
+  // ---- 工具 ----
+  function duration(mode) { return settings[mode] * 60; }
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    if (sec >= 3600) {
+      const h = Math.floor(sec / 3600);
+      return h + ':' + String(m % 60).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  // ---- 渲染 ----
+  function applyTheme() {
+    document.body.dataset.theme = settings.theme;
+    els.themeBtn.textContent = settings.theme === 'dark' ? '☀️' : '🌙';
+  }
+  function applyModeColor() {
+    document.documentElement.style.setProperty('--accent', MODE_META[state.mode].color);
+    document.documentElement.style.setProperty('--accent-soft', MODE_META[state.mode].soft);
+    els.phaseLabel.textContent = MODE_META[state.mode].label;
+  }
+  function render() {
+    els.time.textContent = fmt(state.left);
+    const frac = state.total > 0 ? state.left / state.total : 0;
+    els.ring.style.strokeDasharray = RING_C;
+    els.ring.style.strokeDashoffset = RING_C * (1 - frac);
+    els.toggle.textContent = state.running ? '暂停' : (state.left === state.total ? '开始' : '继续');
+    document.title = state.running
+      ? fmt(state.left) + ' · ' + MODE_META[state.mode].label + ' 🍅'
+      : '🍅 番茄钟';
+    renderDots();
+    els.stat.textContent = '今日完成 ' + state.focusToday + ' 个番茄';
+  }
+  function renderDots() {
+    const n = settings.interval;
+    const filled = state.mode === 'long' ? n : (state.focusCount % n);
+    els.dots.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i < filled ? ' filled' : '');
+      els.dots.appendChild(d);
+    }
+  }
+  function renderModeTabs() {
+    [...els.modes.children].forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
+  }
+
+  // ---- 声音 / 通知 ----
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function beep(freq, start, dur) {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, audioCtx.currentTime + start);
+    g.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime + start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime + start); o.stop(audioCtx.currentTime + start + dur + 0.05);
+  }
+  function playEnd() {
+    if (!settings.sound) return;
+    try {
+      ensureAudio();
+      beep(880, 0, 0.3); beep(660, 0.18, 0.3); beep(990, 0.36, 0.45);
+    } catch (e) {}
+  }
+  function notify(title, body) {
+    if (!settings.notify || !('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      try { new Notification(title, { body: body }); } catch (e) {}
+    }
+  }
+
+  // ---- 核心流程 ----
+  function setMode(mode, auto) {
+    state.mode = mode;
+    state.total = duration(mode);
+    state.left = state.total;
+    renderModeTabs();
+    applyModeColor();
+    stopTimer();
+    render();
+    if (auto && settings.autoStart) start();
+  }
+
+  function start() {
+    if (state.running) return;
+    if (settings.notify && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    state.running = true;
+    state.endTime = Date.now() + state.left * 1000;
+    state.timer = setInterval(tick, 200);
+    render();
+  }
+  function pause() {
+    if (!state.running) return;
+    state.left = Math.max(0, Math.round((state.endTime - Date.now()) / 1000));
+    stopTimer();
+    render();
+  }
+  function toggle() { state.running ? pause() : start(); }
+  function stopTimer() {
+    state.running = false;
+    if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  }
+  function reset() {
+    stopTimer();
+    state.left = state.total;
+    render();
+  }
+  function skip() { onPhaseEnd(true); }
+
+  function tick() {
+    state.left = Math.max(0, Math.round((state.endTime - Date.now()) / 1000));
+    if (state.left <= 0) onPhaseEnd(false);
+    else render();
+  }
+
+  function onPhaseEnd(skipped) {
+    const finished = state.mode;
+    stopTimer();
+    playEnd();
+
+    if (finished === 'focus') {
+      state.focusCount++;
+      state.focusToday++;
+      saveToday();
+      const next = (state.focusCount % settings.interval === 0) ? 'long' : 'short';
+      notify('专注结束 🍅', '干得漂亮！休息一下（' + MODE_META[next].label + '）');
+      setMode(next, !skipped);
+    } else {
+      if (finished === 'long') {
+        notify('休息结束', '准备好开始新一轮专注了吗？');
+      } else {
+        notify('休息结束', '开始下一个专注吧 💪');
+      }
+      setMode('focus', !skipped);
+    }
+  }
+
+  // ---- 事件绑定 ----
+  els.toggle.addEventListener('click', () => { toggle(); });
+  els.reset.addEventListener('click', reset);
+  els.skip.addEventListener('click', skip);
+
+  els.modes.addEventListener('click', e => {
+    const b = e.target.closest('.mode-btn');
+    if (!b) return;
+    stopTimer();
+    setMode(b.dataset.mode, false);
+  });
+
+  els.themeBtn.addEventListener('click', () => {
+    settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
+    saveSettings(); applyTheme();
+  });
+
+  els.settingsBtn.addEventListener('click', () => {
+    els.setFocus.value = settings.focus;
+    els.setShort.value = settings.short;
+    els.setLong.value = settings.long;
+    els.setInterval.value = settings.interval;
+    els.setAuto.checked = settings.autoStart;
+    els.setSound.checked = settings.sound;
+    els.setNotify.checked = settings.notify;
+    els.overlay.classList.add('open');
+  });
+  els.overlay.addEventListener('click', e => { if (e.target === els.overlay) els.overlay.classList.remove('open'); });
+  els.save.addEventListener('click', () => {
+    settings.focus = Math.max(1, +els.setFocus.value || 25);
+    settings.short = Math.max(1, +els.setShort.value || 5);
+    settings.long = Math.max(1, +els.setLong.value || 15);
+    settings.interval = Math.max(1, +els.setInterval.value || 4);
+    settings.autoStart = els.setAuto.checked;
+    settings.sound = els.setSound.checked;
+    settings.notify = els.setNotify.checked;
+    saveSettings();
+    els.overlay.classList.remove('open');
+    if (!state.running) {
+      state.total = duration(state.mode);
+      state.left = state.total;
+      render();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.key === 'r' || e.key === 'R') reset();
+    else if (e.key === 's' || e.key === 'S') skip();
+  });
+
+  // ---- 初始化 ----
+  applyTheme();
+  applyModeColor();
+  renderModeTabs();
+  renderDots();
+  render();
+})();
+</script>
+</body>
+</html>
